@@ -1,0 +1,230 @@
+---
+title: "Fear and Anger as Motivators for Voter Turnout"
+subtitle: "Datasci 203: An Example Statistical Analysis"
+author: "Paul Laskowski, Alex Hughes, and the 203 Teaching Team" 
+output:
+  bookdown::pdf_document2: 
+    toc: true
+    number_sections: true
+---
+
+\newpage
+\setcounter{page}{1}
+
+```{r load packages and set options, include=FALSE}
+library(tidyverse) 
+library(magrittr)
+library(knitr)
+library(patchwork)
+library(moments)
+
+theme_set(theme_bw())
+
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+
+```
+
+```{r load data}
+anes <- read_csv("anes_pilot_2018.csv")
+nrow_original <- nrow(anes)
+```
+
+```{r clean data}
+anes <- anes %>% 
+  mutate(
+    voted_2016 = case_when(
+      turnout16 == 1 ~ T, 
+      turnout16 == 2 ~ F, 
+      turnout16 == 3 & turnout16b == 1 ~ T, 
+      turnout16 == 3 & turnout16b == 2 ~ F), 
+    voted_2018 = case_when(
+      turnout18 %in% 1:3 ~ T, 
+      turnout18 == 4 ~ F, 
+      turnout18 == 5 & turnout18ns == 1 ~ T, 
+      turnout18 == 5 & turnout18ns == 2 ~ F)
+  ) 
+```
+
+```{r subset to valid values}
+anes <- anes %>% 
+  filter(
+    geangry  >= 0, 
+    geafraid >= 0, 
+    !is.na(voted_2016), 
+    !is.na(voted_2018)
+  )
+
+nrow_valid1 <- nrow(anes)
+
+anes <- anes %>% 
+  filter(
+    birthyr < 1998
+  )
+nrow_valid2 <- nrow(anes)
+```
+
+```{r create new variables}
+anes <- anes %>% 
+  mutate(
+    emotions = case_when(
+      geafraid < geangry  ~ 'More Anger', 
+      geafraid == geangry ~ 'Equal', 
+      geafraid > geangry  ~ 'More Fear'),
+    emotions = factor(emotions, levels = c('More Anger', 'Equal', 'More Fear')),
+    voting_change = voted_2018 - voted_2016
+  )
+
+```
+
+# Importance and Context
+
+In the United States, the last decades have seen an increasingly polarized political climate. On a set of political questions measured by the Pew Research Center, the average partisan gap between liberals and conservatives has increased from 15 percentage points in 1994 to 36 percentage points in 2017 \footnote{Pew Research Center. "The partisan divide on political values grows even wider." (2017).}.  At the same time, national elections have been decided by increasingly narrow margins.  In both 2000 and 2016, the winner of the presidential election lost the popular vote - an event that hadn't occurred previously since 1888. Responding to this environment, political campaigns have increasingly emphasized voter turnout as a way to winning elections. The question of how to motivate voters to show up at the polls has become crucial to political strategists, as well as commentators and researchers.
+
+This analysis contributes to the discussion of voter motivation, focusing on two emotions that frequently surface in discussions of the 2016 election: anger and fear. These two emotions are often cited in explaining voter behavior, and they are key targets that political advertisements are designed to play on.  While anger and fear often go hand in hand, they may differ in how well they motivate voter turnout, as well as how they contribute to the overall polarization of society.  As a first step, this analysis aims to address the following research question:
+
+\begin{quote}
+  \textit{Was fear or anger more effective at causing voters to turn out in the 2018 election?}
+\end{quote}
+
+The answer to this question could provide guidance to future political campaigns hoping to increase voter turnout. It could also provide useful background for governments that are interested civic participation. A better understanding of the factors that polarize society, and how they express themselves through the voting process, may also help those hoping to counteract that polarization.
+
+# Data and Methodology
+
+Our analysis leverages data from the 2018 American National Election Studies (ANES).  This is an observational dataset, based on a sample of respondents drawn from the YouGov platform. The YouGov panel is not nationally representative, and consists of participants who sign up to complete questionnaires in exchange for rewards.  This dataset includes `r nrow_original` individuals. We remove individuals who do not have election turnout values reported in either 2016 or 2018, as well as individuals who either report that they "Do not know", or "Did not respond" to the key _anger_ or _fear_ survey questions. This leaves `r nrow_valid1` observations.
+
+As we report in Table \@ref(tab:summary-table), 70% of ANES respondents report that they voted in both the 2016 and 2018 elections. While turnout of 75% might be expected in the presidential general, it is highly unusual to have turnout this high in an off-cycle election. Also notable in this data is that voting (or not voting) seems to be highly consistent over time -- only 10% of the respondents report taking a different action in 2016 compared to 2018. 
+
+To operationalize the concept of voter turnout, we consider changes in voting behavior from 2016 to 2018. We refer to a change from not voting to voting as a voting increase, and a change from voting to not voting as a voting decrease. Although the net total of increases and decreases may be interesting in some contexts, we focus on voting increases as our main outcome variable. We believe that the "new voters" this variable identifies are especially relevant to a study of increasing turnout. We exclude voters who were potentially too young to vote in 2016, resulting in `r nrow_valid2` observations.
+
+As an alternative to our focus on voting increases, we considered directly comparing voting rates in one fixed election. However, most individuals maintain the same voting behavior over time, making it difficult to relate a single voting decision to emotions in 2018. 
+
+```{r make summary table} 
+summary_table <- anes %>% 
+  mutate(
+    print_vote_2016 = case_when(
+      voted_2016 ~ 'Voted 2016', 
+      !voted_2016 ~ 'Did not Vote 2016'), 
+    print_vote_2018 = case_when(
+      voted_2018 ~ 'Voted 2018', 
+      !voted_2018 ~ 'Did not Vote 2018')) %$% 
+  prop.table(
+    table(
+      print_vote_2016, 
+      print_vote_2018))
+```
+
+```{r summary-table}
+kable(
+  summary_table,
+  digits = 2,
+  caption = 'Self-Reported Voting Behavior in 2016 and 2018', 
+  booktabs = TRUE, 
+)
+```
+
+The survey includes questions about how angry and how afraid respondents "feel about the way things are going in this country." Data is reported on a 5-point Likert scale that ranges from 1 ("not at all") to 5 ("extremely"), and the same question is asked to each respondent. These questions are about emotions in general, not necessarily emotions relevant to voting, and the survey does not provide more information about whether these emotions *cause* voting behavior to change.
+
+Because of the observational nature of the ANES data, we are not able to directly measure whether anger or fear *causes* voter turnout.  We can only check whether angry people or fearful people are more likely to increase their voting behavior.  Care must therefore be taken before drawing causal conclusions based on our results.
+
+
+
+```{r fear-anger-joint}
+fear_anger_joint <- anes %>% 
+  ggplot(aes(x = geangry, y = geafraid)) + 
+  geom_jitter(alpha = 0.20) + 
+  labs(
+    x = 'Anger', y = 'Fear', 
+    title = 'Fear & Anger Relationship') 
+```
+
+```{r turnout-by-emotion}
+  turnout_by_emotion <- 
+  anes %>% 
+  select(voting_change, emotions) %>%
+  group_by(emotions) %>% 
+  summarise(increase = mean(voting_change ==1), decrease = mean(voting_change==-1)) %>% 
+  ggplot() + 
+  geom_col( aes( x=emotions, y=increase, fill = 'Increase'),
+            width = 0.5,
+            position = 'stack') +
+  geom_text(aes( x=emotions, y=increase, label = paste(formatC(100 * decrease,digits= 1, format = "f"),'%')),  hjust = 1, colour = "white") +
+  geom_col( aes( x=emotions, y=-decrease, , fill = 'Decrease'),
+            width = 0.5,
+            position = 'stack') +
+geom_text(aes( x=emotions, y=-decrease, label = paste(formatC(100 * decrease,digits= 1, format = "f"),'%')),  hjust = -.1, colour = "white") +
+  annotate("text", x = 3.7, y = -.0008, label = "< Decrease   Increase >") +
+  expand_limits(x = 4) +
+  scale_y_continuous(limits = c(-.065, .065)) +
+  geom_hline(yintercept = 0) +
+  ylab('Fraction of Subjects') +
+  xlab(NULL)+
+  labs(fill="Voting Behavior") +
+  ggtitle('Changes in Voting Behavior')+
+  theme(legend.position = 'none') +
+  coord_flip()
+```
+
+
+
+```{r plots, fig.cap='Voter Emotions and Voter Turnout. The red series did not vote; the blue series did vote.', fig.pos='!b', fig.height = 3}
+(fear_anger_joint | turnout_by_emotion)
+```
+
+The left panel of Figure \@ref(fig:plots)  plots the empirical joint distribution of respondents' feelings of fear and anger. The two emotions are strongly related (Spearman correlation = `r round(cor(anes$geangry, anes$geafraid, method = 'spearman'),2)`) with `r round(mean(anes$geangry == anes$geafraid),2)` of respondents reporting equal levels of anger and fear.
+
+To compare the two emotions, we identify the respondents who are more angry than afraid, and the respondents who are more afraid than angry.  While we could preserve more information by subtracting one measure from the other, this would inappropriately impose a metric structure on these ordinal variables.
+
+We find that there are `r sum(anes$emotions == 'More Anger', na.rm = TRUE)` people in the more-anger group and `r sum(anes$emotions == 'More Fear', na.rm = TRUE)` people in the more-fear group. The right panel of Figure \@ref(fig:plots) shows the fraction of people in each group that reported an increase or decrease in voting behavior. Subjects reporting equal emotions displayed the most frequent changes in voting behavior, both increases and decreases. Compared to the more-anger group, subjects in the more fear group showed more frequent increases in voting behavior, and also more frequent decreases. In line with our research question, we focus our attention on the probability of increasing voting behavior within each group. 
+
+Both our grouping variable and our outcome variable are measured at the binary level. In this circumstance, common tests could include a two-sample proportion test and Fisher's exact test. We proceed with a two-sample t-test to demonstrate tools used in DATASCI 203.  Given the large sample sizes, the loss of accuracy from the t-test will be negligible.
+
+The null hypothesis of our t-test can be phrased as follows: 
+
+\begin{quote}
+  \textbf{Null Hypothesis:} \textit{The probability that a member of the more-anger group shows an increase in voting is equal to the probability that a member of the more-fear group shows an increase in voting}
+\end{quote}
+
+In order for a t-test to produce reliable inference the following must be true: the data must be drawn from an i.i.d. sample; measured on a metric scale; and, be sufficiently normal that the central limit theorem ensures convergence in distribution. We address each of these requirements in turn.
+
+First, data must be generated via an i.i.d. process.  The ANES 2018 pilot uses a panel of individuals from the YouGov platform. There is a possibility that this introduces dependencies.  For example, participants may tell friends or family members about YouGov, resulting in a cluster of individuals that give similar responses.  Nevertheless, YouGov claims to have millions of users, which suggests that links between individuals should be rare. 
+
+Second, the outcome variable must be measured on a metric scale. In our case, the presence of a voting increase is a binary variable. A binary variable qualifies as metric as there is only a single interval, which goes from zero to one.
+
+
+Finally, the data must be sufficiently normal so that the CLT produces convergence in distribution to a Gaussian distribution. The small number of new voters can be understood as a positive skew in our turnout variable (skewness = `r round(skewness(anes$voting_change == 1),2)`).  Nevertheless, the large sample size suggests that the sampling distribution of the statistic should be approximately normal via the Central Limit Theorem. 
+
+# Results
+
+```{r t-test, echo=TRUE} 
+test <- anes %>% filter(emotions %in% c('More Anger', 'More Fear')) %>% 
+t.test(I(voting_change == 1) ~ emotions, data = .)
+```
+
+```{r produce differences}
+differences <- anes %>% 
+  filter(
+    voted_2016 == 'Did not Vote', 
+    voted_2018 == 'Voted', 
+    geangry != geafraid) %>% 
+  summarise(
+    more_angry = geangry > geafraid, 
+    more_afraid = geangry < geafraid)
+```
+
+```{r produce difference in new voter percentage}
+new_voters <- anes %>% 
+  filter(emotions %in% c('More Anger', 'More Fear')) %>% 
+  group_by(emotions) %>% 
+  summarise(percent =  round(mean(voting_change==1) * 100, 2))
+```
+
+The test yields evidence that more-fearful people are more likely than more-angry people to increase voting behavior (t=`r round(test$statistic, 2)`, p=`r round(test$p.value, 2)`).  From a practical perspective, this result appears potentially important.  In the more-anger group, `r new_voters[new_voters$emotions=='More Anger', 'percent']` percent of participants are new voters.  This compares to `r new_voters[new_voters$emotions=='More Fear', 'percent']` percent in the more-fear group, a difference of `r new_voters[new_voters$emotions=='More Fear', 'percent'] - new_voters[new_voters$emotions=='More Anger', 'percent']` percentage points.  A difference of this size might typically be considered a small effect, but in a highly competitive, polarized electorate, even a small increase in message effectiveness may swing an election.
+
+Several limitations of our test affect the conclusions that may be drawn from it.  As mentioned above, we are only able to measure associations between emotions and voting increases, not whether one feature causes the other Additionally, the ANES data is not nationally representative, suggesting that our results may not generalize to the US population.
+
+# Discussion
+
+This study found evidence that fear is more effective than anger at driving voter turnout.  The effect appears practically significant, with more-fearful people estimated to be nearly twice as likely to be new voters in 2018.  While the absolute number of new voters remains small, in a polarized and closely divided electorate, the difference of `r round(100* (mean(anes$new_voter[anes$emotions == 'More Fear'], na.rm=T) - mean(anes$new_voter[anes$emotions == 'More Anger'], na.rm=T)) ,3)` percentage points may be enough to swing some close elections.  
+
+Our results may be of key interest to political campaigns, who have the goal of tailoring advertisements to drive their supporters to the polls. While this study addresses emotions in general, future studies may focus directly on the emotional content of political advertisements. We are especially interested in manipulating the emotional content of advertisements in an experiment, providing a way to measure the causal pathway from emotion to voting behavior. Finally, we hope that a general understanding of emotions and voting can benefit society more broadly, by revealing new ways to manage political polarization.
