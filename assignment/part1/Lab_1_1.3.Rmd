@@ -1,0 +1,256 @@
+---
+title: 'Lab_1 Problem 1.3: Test Assumptions'
+output:
+  word_document: default
+  pdf_document: default
+---
+QUESTION: For the four following questions, your task is to evaluate the assumptions for the given test. It is not enough to say that an assumption is met or not met; instead, present your evidence in the form of background knowledge, visualizations, and numerical summaries. If you produce a histogram as part of your evaluation, be sure to consider what the most appropriate bin width is. The test that we ask you to evaluate may or may not be the most appropriate test for the scenario. Because the goal of this task is to evaluate whether the data satisfies the assumptions necessary for the test to provide meaningful results, you do not need perform the test (you may perform the test, but we will not be marking for the test results).
+
+# 1.3.1 World Happiness
+QUESTION: The file datasets/Happiness_WHR.csv is subsetted from the World Happiness Report, a yearly publication that uses data from the Gallup World Poll surveys. The variable life ladder is a measure of happiness, described in the FAQ as follows: This is called the Cantril ladder: it asks respondents to think of a ladder, with the best possible life for them being a 10, and the worst possible life being a 0. They are then asked to rate their own current lives on that 0 to 10 scale. The rankings are from nationally representative samples,for the years 2018-2020.
+You would like to know whether people in countries with high GDP per capita (higher than the mean) are more happy or less happy than people in countries with low GDP (lower than the mean).
+
+# Solution
+## Test Assumptions for a Two Sample t-Test
+1. Metric scale (In particular, the t-test is not valid for variables which only have an ordinal structure)
+2. IID data
+3. No major deviations from normality, considering the sample size (In particular, the t-test is invalid for highly skewed distributions when sample size is larger than 30. It may also be invalid for very highly skewed distributions at higher sample sizes)
+
+### Metric Scale
+Upon evaluating the dataset happinees_WHR.csv, although the evaluation was on a scale of 1-10, the Cantril Ladder is an example of a Likert Scale meaning that we have a non-metric scale.  In other words the values used in the dataset rely upon opinion (qualitative measurement) rather than a quantitative  measurement.  Therefore a two sample t-test fails on this assumption.  View the query below to get an understanding of the happinees_WHR.csv dataset.
+
+```{r}
+library(readr)
+happiness_WHR <- read_csv("happiness_WHR.csv")
+summary(happiness_WHR)
+```
+
+### IID Data
+Based on background knowledge, given that each country is fairly independent of one another.  There are no apparent violates of independents, some examples being clustering of data, in geographical regions, school cohorts, or families, strategical  interaction, like competition among sellers or imitation of a species, or autocorrelation were one time period may affect the next.  The data also appears to be identically distributed as will be shown in the plots below. This assumption for the data is meet, but as stated previously, a t-test would not be a wise test to use for a non-metric statistical analysis.
+
+### No Major Deviations from Normality
+This assumption would not be met if the distribution was highly skewed for distributions when the sample size is larger than 30.  While our data is slightly left skewed, it does not meet the criteria  for highly skewed data and therefore this assumption is meet. Please see the histograms below
+
+The steps taken here to create the histograms were to first separate  the data based off of high and low GDP as done by splitting across the mean GDP of the given 239 countries.
+```{r}
+m <- mean(happiness_WHR$`Log GDP per capita`, na.rm = TRUE)
+h_GDP <- subset(happiness_WHR, subset = happiness_WHR$`Log GDP per capita` > m)
+l_GDP <- subset(happiness_WHR, subset = happiness_WHR$`Log GDP per capita` < m)
+```
+
+Next, two histograms were made and show the left skewness of the distribution for high and low GDP countries.
+
+```{r}
+hist(l_GDP$`Life Ladder`,
+     main="Histogram for Happiness of Low GDP countries", 
+     xlab="Average Life Ladder Score per Country", 
+     col="green",
+     xlim=c(1,10),
+     breaks=15)
+```
+
+
+```{r}
+hist(h_GDP$`Life Ladder`,
+     main="Histogram for Happiness of High GDP countries", 
+     xlab="Average Life Ladder Score per Country", 
+     col="yellow",
+     xlim=c(1,10),
+     breaks=20)
+```
+
+Lastly, a simple unpaired t-test was run to see what the results  would have been and given the p-value for this example, it would have been likely that the null hypothesis would have been rejected.
+
+```{r}
+t.test(h_GDP$`Life Ladder`, l_GDP$`Life Ladder`)
+```
+# 1.3.2: Legislators
+QUESTION: The file datasets/legislators-current.csv is taken from the congress-legislators project on Github. You would like to test whether Democratic or Republican senators are older.
+List all assumptions for a Wilcoxon rank-sum test (using the Hypothesis of Comparisons). Then evaluate each assumption, presenting evidence based on your background knowledge, visualizations, and numerical summaries.
+
+# Solution
+## Test Assumptions for a Wilcoxon Rank-Sum Test (Hypothesis of Comparisons)
+1. Ordinal Scale
+2. IID Data
+
+Null Hypothesis: The probability that a draw from $X$ ranks higher than a draw from $Y$ is the same as the probability that a draw from $Y$ ranks higher than a draw from $X$.
+
+$P(X>Y) = P(X<Y)$
+
+### Ordinal Scale
+Based on background knowledge, ordinal scale measures data of categorical nature where ordered categories and the distances between the categories are not known. Since we are measuring age given by the birthday of each congressman in this analysis, and age would be considered a metric variable, this test would fail on this assumption and not be a viable option for statistical analysis.  View a summary of the data below. 
+
+```{r}
+library(readr)
+legislators_current <- read_csv("legislators-current.csv")
+summary(legislators_current)
+```
+
+### IID Data
+For this assumption, each $X_i$ has to be drawn from the same distribution, each $Y_i$ has to be drawn from the same distribution, and all $X_i$ and $Y_i$ are mutually independent. There are no apparent violates of independents, some examples being clustering of data, in geographical regions, school cohorts, or families, strategical  interaction, like competition among sellers or imitation of a species, or autocorrelation were one time period may affect the next.  The data also appears to be identically distributed as will be shown in the plots below. This assumption for the data is meet, but as stated previously, the Hypothesis of Comparison version of the Wilcoxon Rank-Sum would not be a wise test to use for a metric statistical analysis.
+
+For the analysis of this dataset, a simple extraction of the each congressmen's birthyear subtracted from the current year yields their age.
+```{r}
+a <- as.POSIXct(legislators_current$birthday, format = "%Y-%m-%d")
+year <- strtoi(format(a, format = "%Y"))
+legislators_current$year = year
+legislators_current$age <- 2021 - legislators_current$year
+```
+
+Next, subsetting the data by Republicans and Democrats in rep and dem respectively.
+
+```{r}
+legislators_current$party[legislators_current$party == 'Independent'] = NA
+rep <- subset(legislators_current, subset = legislators_current$party == "Republican")
+dem <- subset(legislators_current, subset = legislators_current$party == "Democrat")
+```
+
+And finally, plotting the resulting of ages for Republicans and Democrats.
+
+```{r}
+hist(rep$age,
+     main="Histogram for Age of Republican Congressmen", 
+     xlab="Age of Senator", 
+     col="red",
+     breaks=15)
+```
+
+```{r}
+hist(dem$age,
+     main="Histogram for Age of Democrat Congressmen", 
+     xlab="Age of Senator", 
+     col="blue",
+     breaks=15)
+```
+
+And Finally below, I have the Wilcoxon Rank-Sum Test. I'm not sure how to make sure that I'm evaluting the Hypothesis of Comparison version, nevertheless, this version would not be the correct hypothesis test to run because of the failed assumption.
+
+```{r}
+wilcox.test(rep$age, dem$age)
+```
+
+# 1.3.3 Wine and Health
+QUESTION: The dataset wine can be accessed by installing the wooldridge package.
+install.packages("wooldridge")
+library(wooldridge)
+?wine
+wine
+It contains observations of variables related to wine consumption for 21 countries. You would like to use this data to test whether countries have more deaths from heart disease or from liver disease. List all assumptions for a signed-rank test. Then evaluate each assumption, presenting evidence based on your background knowledge, visualizations, and numerical summaries.
+
+# Solution
+## Test Assumptions for Wilcoxon Signed-Rank Test
+1. Metric Scale
+2. IID Data
+3. The distribution of the difference $(X-Y)$ is symmetric around the same mean.
+
+### Metric Sacle
+Based on background knowledge, the X and Y measured here have to be measured on the same scale since we are using a paired test. For this question, both the liver and heart deaths are on the same scale of 100,000 deaths.  This will be shown in the dataset below.
+
+```{r}
+install.packages("wooldridge")
+library(wooldridge)
+?wine
+wine
+```
+
+### IID Data
+Using background knowledge, each pair $(X_i, Y_i)$ has to be drawn from the same distribution independently of all other pairs. Even though this is a small dataset, it appears to be independent due to each observation being a different country and the data also appears to be identically distributed as will be shown in the plots below. In this case, There are no apparent violates of independents, some examples being clustering of data, in geographical regions, school cohorts, or families, strategical  interaction, like competition among sellers or imitation of a species, or autocorrelation were one time period may affect the next. This assumption for the data is meet and thus far, the Wilcoxon Ranked-Summed Test appears to be a viable test.
+
+For the data visualization, two histograms of heart deaths and liver deaths were made in the plots below.
+
+```{r}
+liver_m <- mean(wine$liver)
+heart_m <- mean(wine$heart)
+wine$difference <- wine$heart - wine$liver
+(heart_m - liver_m)
+```
+
+
+
+```{r}
+hist(wine$heart,
+     main="Histogram for Heart Deaths", 
+     xlab="Deaths in 100,000", 
+     col="red")
+```
+
+
+
+```{r}
+hist(wine$liver,
+     main="Histogram for Liver Deaths", 
+     xlab="Deaths in 100,000", 
+     col="yellow")
+```
+
+### The Distribution of the difference $(X-Y)$ is the Same Around Some Mean
+Using the data visualization below, we have taken the difference of Heart and Liver deaths over the 21 different observations and take the difference of their means (162) as the point for the data to be symmetrical around.  The data below shows that even with this small dataset it appears that the data meets this assumption being symmetrical around the mean of 162.
+
+In conclusion, all of the assumptions have been met for this test and it appears to be a viable test to use for this dataset.
+
+```{r}
+hist(wine$difference,
+     main="Histogram for Heart - Liver Deaths", 
+     xlab="Deaths", 
+     col="black")
+```
+
+The test was ran below to see what the results might be.
+
+```{r}
+ wilcox.test(wine$heart, wine$liver, paired=TRUE)
+```
+
+# 1.3.4 Attitudes Towards Religion
+QUESTION:The file datasets/GSS_religion is a subset of data from the 2004 General Social Survey (GSS).
+The variables prottemp and cathtemp are measurements of how a respondent feels towards protestants and towards Catholics, respectively. The GSS questions are phrased as follows:
+I’d like to get your feelings toward groups that are in the news these days. I will use something
+we call the feeling thermometer, and here is how it works: I’ll read the names of a group and I’d like you to rate that group using the feeling thermometer. Ratings between 50 degrees and 100 degrees mean that you feel favorable and warm toward the group. Ratings between 0 degrees and 50 degrees mean that you don’t feel favorable toward the group and that you don’t care too much for that group. If we come to a group whose name you Don’t recognize, you don’t need to rate that group. Just tell me and we’ll move on to the next one. If you do recognize the name, but you don’t feel particularly warm or cold toward the group, you would rate the group at the 50 degree mark. How would you rate this group using the thermometer? You would like to test whether the US population feels more positive towards Protestants or towards Catholics. List all assumptions for a paired t-test. Then evaluate each assumption, presenting evidence based on your
+background knowledge, visualizations, and numerical summaries.
+
+# Solution
+## Test Assumptions Paired t-Test:
+1. Metric Scale
+2. IID Data
+3. No major deviations from normality, considering the sample size.
+
+Null Hypothesis: The expectation of $X$ equals the expectation of $Y$.
+
+### Metric Scale
+Using background information, the t-test is not valid for variables which only have an ordinal structure. In this case, the feeling thermometer used to determines ones feelings towards Catholics or Protestants would fall under the Likert Scale and also be considered of ordinal structure.  Therefore, the test would fail under this assumption.  A summary of the given data is shown below as supporting evidence.
+
+```{r}
+library(readr)
+GSS <- read_csv("GSS_religion.csv")
+summary(GSS)
+```
+
+### IID Data
+Making use of background knowledge, each pair of measurements $(X_i, Y_i)$ is drawn from the same distribution, independently of all other pairs. This data appears to have paring, independence and identical distribution and does not violate. There are no apparent violates of independents, some examples being clustering of data, in geographical regions, school cohorts, or families, strategical  interaction, like competition among sellers or imitation of a species, or autocorrelation were one time period may affect the next.  The data also appears to be identically distributed as will be shown in the plots below. This assumption for the data is meet, but as stated previously, the Paired t-Test would not be a wise test to use for an ordinal scale statistical analysis.
+
+### No Major Deviations from Noramlity, Considering the Sample Size
+Using background knowledge the t-test is invalid for highly skewed distributions when sample size is larger than 30. It may also be invalid for very highly skewed distributions at higher sample sizes.  This does not appear to be the case as shown in the graphs below. This assumption for the data is meet, but as stated previously, the Paired t-Test would not be a wise test to use for an ordinal scale statistical analysis.
+
+```{r}
+hist(GSS$cathtemp,
+     main="Histogram for Temperature Measurments towards Catholics", 
+     xlab="Temp Measurement in Degrees", 
+     col="green")
+```
+
+```{r}
+hist(GSS$prottemp,
+     main="Histogram for Temperature Measurments towards Protestant", 
+     xlab="Temp Measurement in Degrees", 
+     col="pink")
+```
+
+A Paired T-Test was run out of curiosity for the results.
+
+```{r}
+t.test(GSS$prottemp, GSS$cathtemp, paired=TRUE)
+```
+
+In conclusion, through our analysis of the different scenarios where hypothesis tests could be run, the World Happiness statistical test would not be best evaluated with a Two-Sample T-Test, the Legislators problem would not be best evaluated with a hypothesis of comparisons version of the Wilcoxon Rank-Sum Test, the Wine and Health problem does fit all the assumptions for a Wilcoxon Signed-Rank Test and finally the Attitudes towards Religions problem does not fit the assumptions for a Paired T-Test.
+
+
