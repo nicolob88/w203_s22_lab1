@@ -1,0 +1,196 @@
+---
+title: "Wilcoxon Rank-Sum Test for ANES data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Imports
+The library effsize is not installed by default, you might need to install it using `install.packages(effsize)`
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+require(effsize)
+library(effsize)
+```
+
+## Load data
+```{r, warning=FALSE, message=FALSE}
+anes <- read_csv("./data/anes_timeseries_2020_csv_20220210.csv")
+```
+
+## Rename variables
+```{r}
+# Keep only variables of interest
+keeps = c(
+  "V201600",   # gender
+  "V201507x",  # age
+  "V201511x",  # education
+  "V201549x",  # race
+  "V201567",   # children
+  "V201617x",  # family income
+  "V202109x",  # turnout in 2020 election
+  "V202110x",  # 2020 presi vote
+  "V202111x",  # 2020 house vote
+  "V202112x",  # 2020 senate vote
+  "V202113x",  # 2020 gov vote
+  "V201231x",  # party ID
+  "V201019",   # pre. intend to register to vote
+  "V202051",   # post. registered to vote
+  "V202117",   # voting method
+  "V202118",   # usual voting method
+  "V202119",   # how difficult to vote
+  "V202120a",  # registration issues?
+  "V202120b",  # concern on ID card?
+  "V202120c",  # diffculties with absentee ballot
+  "V202120d",  # confusion on ballot/machine
+  "V202120e",  # difficulty getting to polling place
+  "V202120f",  # long wait time at polling place
+  "V202120g",  # work schedule
+  "V202120h",  # bad weather
+  "V202120i",  # issue mailing ballot
+  "V202120j",  # other issue
+  "V202120k",  # no issues voting
+  "V202121",   # how long the wait
+  "V202122",   # how long to get to polling line
+  "V202123",   # main reason not to vote
+  "V202124"    # other reason not to vote
+)
+
+column_names = c(
+  "gender",
+  "age",
+  "education",
+  "race",
+  "children",
+  "income",
+  "voted_2020",
+  "v2020_presi",
+  "v2020_house",
+  "v2020_senate",
+  "v2020_gov",
+  "party",
+  "pre_intent_to_vote",
+  "post_registered_to_tove",
+  "voting_method",
+  "usual_voting_method",
+  "diffvote",
+  "diffvote_reg",
+  "diffvote_idcard",
+  "diffvote_aballot",
+  "diffvote_confmach",
+  "diffvote_gopolling",
+  "diffvote_wait",
+  "diffvote_work",
+  "diffvote_weather",
+  "diffvote_mail",
+  "diffvote_other",
+  "diffvote_none",
+  "diffvote_wait_time",
+  "diffvote_gopolling_time",
+  "diffvote_mainreason",
+  "diffvote_otherreason"
+)
+
+anes_filt = anes[keeps]
+colnames(anes_filt) = column_names
+```
+
+
+## Define party
+If user is any level of democrat (1, 2, 3), the set as "Democrat", if user is any level of Republican (5, 6, 7), then set as "Republican". If user is independent (4), then set as "Independent":
+
+```{r}
+# Create party column
+anes_filt = anes_filt %>%
+  mutate(party_self = case_when(
+    party %in% c(1, 2, 3) ~ "Democrat",
+    party %in% c(5, 6, 7) ~ "Republican",
+    party %in% c(4)       ~ "Independent"
+  ))
+```
+
+The `%>%` and `mutate` operators are part of `dplyr` package. The `%>%` works as the `.` operator in Python, it allow us to chain methods. Mutate allow us to create a new column using a multiple conditional statement.
+
+
+## Clean Data
+We are only going to use those who voted in 2020. Create a new dataset with voters only: 
+```{r}
+anes_voted = anes_filt %>% filter(voted_2020 == 1)
+```
+
+We also want to filter out independents as well as those that don't have a value for voting difficulty (either negative or NA value):
+```{r}
+anes_voted_party_clean = anes_voted %>% 
+  filter(
+    # Filter out NAs or negative values in difficulty voting
+    diffvote >= 0 & !is.na(diffvote) &
+    # Keep only reps and demos
+    party_self %in% c("Republican", "Democrat"))
+```
+
+
+#### Plot distributions
+
+Remember, 1=No difficulty voting and 5=Extremely diffcult to vote.
+```{r}
+anes_voted_party_clean %>% 
+  ggplot() +
+  aes(x=diffvote, fill=party_self, color=party_self) +
+  geom_bar(alpha=0.5, position="dodge", width=0.5) +
+  labs(title="Level of difficulty voting by self determined party")
+```
+
+## Test
+
+Now we can run the test (double tailed). We will assume that $\alpha=0.05$.
+
+$H_0$: Probability of drawing a higher rank (i.e. difficulty) for Democrat is the same as the probability of drawing a higher rand if Republican $\rightarrow P(X<Y) = P(Y<X)$
+
+$H_a$: Probability of drawing a higher rank (i.e. difficulty) for Democrat is NOT the same as the probability of drawing a higher rand if Republican $\rightarrow P(X<Y) \neq P(Y<X)$
+
+```{r}
+wt = wilcox.test(diffvote ~ party_self, data = anes_voted_party_clean,
+            alternative="two.sided",
+            conf.int = TRUE,
+            conf.level=0.95)
+wt
+```
+
+The p-value is less than 0.05, so at $\alpha=0.05$, we reject $H_0$.
+
+### Practical Significance
+
+Although the test is _statistically_ significant, it is not _practically_ significant. The difference between distributions is very small.
+
+Because the metric of the test is _not_ very intuitive, we calculate 3 different metrics to interpret the effect size.
+
+1) By default, R calculates the Hodges-Lehman estimator of effect size which is very small:
+
+```{r}
+wt$estimate
+```
+
+2) The async suggested that the best effect size for this is the correlation effect size $r=\frac{Z}{\sqrt{N}}$. Which is also very small:
+
+```{r}
+z = qnorm(wt$p.value)
+N = count(anes_voted_party_clean)
+eff_corr = z/sqrt(N)
+
+as.numeric(eff_corr)
+```
+
+
+3) We can also calculate Cohen's D metric (this requires the `effsize` package). This specifies how many standard deviations away from the population is one distribution from another one. Again, very small:
+
+```{r}
+cohen.d(diffvote ~ party_self, data = anes_voted_party_clean)
+```
+
+
+
