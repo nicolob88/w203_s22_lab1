@@ -21,7 +21,7 @@ Upon evaluating the dataset happinees_WHR.csv, although the evaluation was on a 
 
 ```{r}
 library(readr)
-happiness_WHR <- read_csv("happiness_WHR.csv")
+happiness_WHR <- read_csv("./datasets/happiness_WHR.csv")
 summary(happiness_WHR)
 ```
 
@@ -82,7 +82,7 @@ Based on background knowledge, ordinal scale measures data of categorical nature
 
 ```{r}
 library(readr)
-legislators_current <- read_csv("legislators-current.csv")
+legislators_current <- read_csv("./datasets/legislators-current.csv")
 summary(legislators_current)
 ```
 
@@ -221,7 +221,7 @@ Using background information, the t-test is not valid for variables which only h
 
 ```{r}
 library(readr)
-GSS <- read_csv("GSS_religion.csv")
+GSS <- read_csv("./datasets/GSS_religion.csv")
 summary(GSS)
 ```
 
