@@ -138,11 +138,25 @@ anes_voted_party_clean = anes_voted %>%
 
 Remember, 1=No difficulty voting and 5=Extremely diffcult to vote.
 ```{r}
+anes_voted_party_clean = anes_voted_party_clean %>%
+  mutate(diffvote_str=case_when(
+    diffvote == 1 ~ "Not difficult",
+    diffvote == 2 ~ "A little difficult",
+    diffvote == 3 ~ "Moderately difficult",
+    diffvote == 4 ~ "Very difficult",
+    diffvote == 5 ~ "Extremely difficult",
+  ))
+```
+
+```{r}
 anes_voted_party_clean %>% 
   ggplot() +
-  aes(x=diffvote, fill=party_self, color=party_self) +
+  aes(x=reorder(diffvote_str, diffvote), fill=party_self, color=party_self) +
   geom_bar(alpha=0.5, position="dodge", width=0.5) +
-  labs(title="Level of difficulty voting by self determined party")
+  labs(
+    title="Level of difficulty voting by self determined party",
+    x="Difficulty voting"
+    )
 ```
 
 ## Difficulty voting Test
@@ -154,11 +168,10 @@ $H_0$: Probability of drawing a higher rank (i.e. difficulty) for Democrat is th
 $H_a$: Probability of drawing a higher rank (i.e. difficulty) for Democrat is NOT the same as the probability of drawing a higher rand if Republican $\rightarrow P(X<Y) \neq P(Y<X)$
 
 ```{r}
-wt = wilcox.test(diffvote ~ party_self, data = anes_voted_party_clean,
+(wt = wilcox.test(diffvote ~ party_self, data = anes_voted_party_clean,
             alternative="two.sided",
             conf.int = TRUE,
-            conf.level=0.95)
-wt
+            conf.level=0.95))
 ```
 
 The p-value is less than 0.05, so at $\alpha=0.05$, we reject $H_0$.
