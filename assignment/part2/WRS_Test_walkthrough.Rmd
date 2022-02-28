@@ -145,7 +145,7 @@ anes_voted_party_clean %>%
   labs(title="Level of difficulty voting by self determined party")
 ```
 
-## Test
+## Difficulty voting Test
 
 Now we can run the test (double tailed). We will assume that $\alpha=0.05$.
 
@@ -175,22 +175,53 @@ Because the metric of the test is _not_ very intuitive, we calculate 3 different
 wt$estimate
 ```
 
-2) The async suggested that the best effect size for this is the correlation effect size $r=\frac{Z}{\sqrt{N}}$. Which is also very small:
+2) The async suggested that the best effect size for this is the correlation effect size $r=\frac{Z}{\sqrt{N}}$. Which is also very small (anything below 0.1 is considered small):
 
 ```{r}
-z = qnorm(wt$p.value)
+z = qnorm(wt$p.value/2)
 N = count(anes_voted_party_clean)
-eff_corr = z/sqrt(N)
+eff_corr = abs(z)/sqrt(N)
 
 as.numeric(eff_corr)
 ```
 
 
-3) We can also calculate Cohen's D metric (this requires the `effsize` package). This specifies how many standard deviations away from the population is one distribution from another one. Again, very small:
+3) We can also calculate Cohen's D metric (this requires the `effsize` package). This specifies how many standard deviations away from the population is one distribution from another one. Again, very small as the test states (i.e. insignificant):
 
 ```{r}
 cohen.d(diffvote ~ party_self, data = anes_voted_party_clean)
 ```
+
+
+### Run with coin package
+
+```{r}
+install.packages("coin")
+library(coin)
+```
+
+Run the test using the test available in this package, which runs a MC analysis:
+
+```{r}
+anes_voted_party_clean$party_self_f = factor(anes_voted_party_clean$party_self) 
+(wtc = wilcox_test(diffvote ~ party_self_f, 
+            data = anes_voted_party_clean))
+```
+
+
+Effect size using r statistic. For this we need the `rcompanion` package
+
+```{r, message=FALSE, warning=FALSE}
+library(rcompanion)
+```
+
+```{r}
+wilcoxonR(x=anes_voted_party_clean$diffvote, g=anes_voted_party_clean$party_self_f)
+```
+
+
+
+
 
 
 
