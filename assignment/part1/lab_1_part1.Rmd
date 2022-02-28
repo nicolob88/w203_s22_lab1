@@ -352,7 +352,7 @@ ggplot() +
   aes(x=GSS$cathtemp) +
   geom_histogram(color="blue", fill="blue", alpha=0.5, bins=10) +
   labs(
-    title="Histogram for Temperature Measurments towards Catholics",
+    title="Histogram for Temperature Measurements towards Catholics",
     x="Temp Measurement in Degrees"
   )
 ```
@@ -363,7 +363,7 @@ ggplot() +
   aes(x=GSS$prottemp) +
   geom_histogram(color="red", fill="red", alpha=0.5, bins=10) +
   labs(
-    title="Histogram for Temperature Measurments towards Protestant",
+    title="Histogram for Temperature Measurements towards Protestant",
     x="Temp Measurement in Degrees"
   )
 ```
